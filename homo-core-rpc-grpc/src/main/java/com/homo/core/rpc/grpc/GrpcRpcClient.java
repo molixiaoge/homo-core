@@ -205,7 +205,7 @@ public class GrpcRpcClient implements RpcClient {
         ManagedChannel callChannel = getChannel(true);
         RpcCallServiceGrpc.RpcCallServiceStub stub = RpcCallServiceGrpc.newStub(callChannel);//多路复用
         CallQueue callQueue = CallQueueMgr.getInstance().getLocalQueue();
-        Span span = ZipkinUtil.currentSpan().annotate(ZipkinUtil.CLIENT_SEND_TAG);;
+        Span span = ZipkinUtil.currentSpan().kind(Span.Kind.CLIENT).annotate(ZipkinUtil.CLIENT_SEND_TAG);
         TraceLogUtil.setTraceIdBySpan(span,"rpcClient asyncBytesCall");
         Homo<Tuple2<String, byte[]>> warp = Homo.warp(new ConsumerWithException<HomoSink<Tuple2<String, byte[]>>>() {
             @Override
@@ -232,6 +232,7 @@ public class GrpcRpcClient implements RpcClient {
                         TraceLogUtil.setTraceIdBySpan(span,"asyncBytesCall onError");
                         log.trace("asyncBytesCall onError, serviceName {} msgId {}", host, msgId);
                         span.error(throwable);
+                        span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish();
                         sink.error(throwable);
                         releaseChannel(callChannel);
                     }
@@ -240,7 +241,7 @@ public class GrpcRpcClient implements RpcClient {
                     public void onCompleted() {
                         TraceLogUtil.setTraceIdBySpan(span,"asyncBytesCall onCompleted");
                         log.trace("asyncBytesCall onCompleted, serviceName {} msgId {} resultsSize {}", host, msgId,results.length);
-                        span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG);
+                        span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish();
                         //目前看来返回值不大可能会有多个，所以这里暂时只返回result[0]
                         sink.success(Tuples.of(msgId, results[0]));
                         releaseChannel(callChannel);
@@ -360,6 +361,7 @@ public class GrpcRpcClient implements RpcClient {
                         TraceLogUtil.setTraceIdBySpan(span,"asyncJsonCall throwable");
                         log.trace("asyncJsonCall onCompleted, serviceName {} msgId {}", host, msgId);
                         span.error(throwable);
+                        span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish();
                         sink.error(throwable);
                         releaseChannel(channel);
                     }
@@ -368,7 +370,7 @@ public class GrpcRpcClient implements RpcClient {
                     public void onCompleted() {
                         TraceLogUtil.setTraceIdBySpan(span,"asyncJsonCall throwable");
                         log.trace("asyncJsonCall onCompleted, serviceName {} msgId {}", host, msgId);
-                        span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG);
+                        span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish();
                         sink.success(Tuples.of(msgId, results));
                         releaseChannel(channel);
                     }

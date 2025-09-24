@@ -23,6 +23,9 @@ public class GrpcRpcCallService extends RpcCallServiceGrpc.RpcCallServiceImplBas
     @Override
     public void rpcCall(Req req, StreamObserver<Res> responseObserver) {
         Span span = SpanInterceptor.getSpan(req.getMsgId(), req.getTraceInfo());
+        if (span != null) {
+            span.kind(Span.Kind.SERVER).annotate(ZipkinUtil.SERVER_RECEIVE_TAG);
+        }
         String msgId = req.getMsgId();
         byte[][] params = new byte[req.getMsgContentCount()][];
         for (int i = 0; i < req.getMsgContentCount(); i++) {
@@ -55,6 +58,7 @@ public class GrpcRpcCallService extends RpcCallServiceGrpc.RpcCallServiceImplBas
                         try {
                             span.error(throwable);
                             Res res = CallErrorProcessor.processError(req, throwable);
+                            span.annotate(ZipkinUtil.SERVER_SEND_TAG).finish();
                             responseObserver.onNext(res);
                             responseObserver.onCompleted();
                         } catch (Exception e) {
@@ -75,6 +79,9 @@ public class GrpcRpcCallService extends RpcCallServiceGrpc.RpcCallServiceImplBas
             public void onNext(StreamReq req) {
                 try {
                     Span span = ZipkinUtil.currentSpan();
+                    if (span != null) {
+                        span.kind(Span.Kind.SERVER).annotate(ZipkinUtil.SERVER_RECEIVE_TAG);
+                    }
                     String msgId = req.getMsgId();
                     byte[][] params = new byte[req.getMsgContentCount()][];
                     for (int i = 0; i < req.getMsgContentCount(); i++) {
@@ -142,6 +149,9 @@ public class GrpcRpcCallService extends RpcCallServiceGrpc.RpcCallServiceImplBas
         String msgId = req.getMsgId();
         String msgContent = req.getMsgContent();
         Span span = SpanInterceptor.getSpan(req.getMsgId(), req.getTraceInfo());
+        if (span != null) {
+            span.kind(Span.Kind.SERVER).annotate(ZipkinUtil.SERVER_RECEIVE_TAG);
+        }
         try {
             JsonRpcContent rpcContent = new JsonRpcContent();
             rpcContent.setMsgId(msgId);
@@ -150,6 +160,7 @@ public class GrpcRpcCallService extends RpcCallServiceGrpc.RpcCallServiceImplBas
             rpcServer.onCall(req.getSrcService(), req.getMsgId(), rpcContent)
                     .consumerValue(resData -> {
                         JsonRes.Builder builder = JsonRes.newBuilder().setMsgId(req.getMsgId()).setMsgContent(resData);
+                        span.annotate(ZipkinUtil.SERVER_SEND_TAG).finish();
                         responseObserver.onNext(builder.build());
                         responseObserver.onCompleted();
                     })

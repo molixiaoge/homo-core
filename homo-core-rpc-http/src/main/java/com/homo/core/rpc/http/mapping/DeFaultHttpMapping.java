@@ -91,13 +91,7 @@ public class DeFaultHttpMapping extends AbstractHttpMapping implements Module, A
         log.info("httpGet begin port {} msgId {} msg {}", port, msgId, msg);
         HttpServer httpServer = routerHttpServerMap.get(port);
         Mono<DataBuffer> respBuffer = httpServer.onJsonCall(msgId, msg, response);
-        return response.writeAndFlushWith(Mono.just(respBuffer))
-                .doFinally(ret -> {
-                    if (span != null) {
-                        span.annotate(ZipkinUtil.SERVER_SEND_TAG);
-                        span.finish();
-                    }
-                });
+        return response.writeAndFlushWith(Mono.just(respBuffer));
     }
 
 
@@ -156,13 +150,7 @@ public class DeFaultHttpMapping extends AbstractHttpMapping implements Module, A
                                     }
                                 }
                         ));
-        return response.writeAndFlushWith(resp)
-                .doFinally(ret -> {
-                    if (span != null) {
-                        span.annotate(ZipkinUtil.SERVER_SEND_TAG);
-                        span.finish();
-                    }
-                });
+        return response.writeAndFlushWith(resp);
     }
 
     /**
@@ -211,13 +199,7 @@ public class DeFaultHttpMapping extends AbstractHttpMapping implements Module, A
                         })
                 );
 
-        return response.writeAndFlushWith(resp)
-                .doFinally(ret -> {
-                    if (span != null) {
-                        span.annotate(ZipkinUtil.SERVER_SEND_TAG);
-                        span.finish();
-                    }
-                });
+        return response.writeAndFlushWith(resp);
     }
 
     /**

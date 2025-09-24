@@ -18,7 +18,12 @@ public abstract class ProtoGateLogicHandler extends AbstractGateLogicHandler<Msg
         if (header.getType() == GateMessageType.PROTO.ordinal()) {
             Msg msg = Msg.parseFrom(messagePackage.getBody());
             GateClient gateClient = ctx.channel().attr(TcpGateDriver.clientKey).get();
-            ZipkinUtil.startScope(ZipkinUtil.newSRSpan(), span -> doProcess(msg, gateClient,header), null);
+            // SR at inbound; SS after processing
+            ZipkinUtil.startScope(
+                    ZipkinUtil.nextOrCreateSRSpan(),
+                    span -> doProcess(msg, gateClient, header),
+                    span -> span.annotate(ZipkinUtil.SERVER_SEND_TAG).finish()
+            );
         } else {
             //不是proto数据 交给下一个handler处理
             ctx.fireChannelRead(source);

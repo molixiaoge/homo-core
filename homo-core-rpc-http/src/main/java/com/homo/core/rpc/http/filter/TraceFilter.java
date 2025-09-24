@@ -25,8 +25,7 @@ public class TraceFilter implements WebFilter {
         Tracer.SpanInScope spanInScope = ZipkinUtil.startScope(rootSpan);
         return chain.filter(exchange)
                 .doFinally(sing -> {
-                    rootSpan
-                            .annotate(ZipkinUtil.SERVER_SEND_TAG);
+                    rootSpan.annotate(ZipkinUtil.SERVER_SEND_TAG).finish();
                     log.trace("TraceFilter process end url {} traceId {}", url, traceId);
                     spanInScope.close();
                 });
@@ -52,6 +51,7 @@ public class TraceFilter implements WebFilter {
                 span = ZipkinUtil.getTracing()
                         .tracer()
                         .newChild(traceContext)
+                        .kind(Span.Kind.SERVER)
                         .annotate(ZipkinUtil.SERVER_RECEIVE_TAG)
                         .name("nextProxyTrace")
                         .tag("url", url);
@@ -65,6 +65,7 @@ public class TraceFilter implements WebFilter {
 
             } else {
                 span = ZipkinUtil.newSRSpan()
+                        .kind(Span.Kind.SERVER)
                         .name("proxyTrace")
                         .annotate(ZipkinUtil.SERVER_RECEIVE_TAG)
                         .tag("type", "router")

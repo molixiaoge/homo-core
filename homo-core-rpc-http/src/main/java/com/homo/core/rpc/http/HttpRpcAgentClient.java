@@ -41,6 +41,7 @@ public class HttpRpcAgentClient implements RpcAgentClient {
     public Homo rpcCall(String funName, RpcContent content) {
         Span span = ZipkinUtil.getTracing().tracer()
                 .nextSpan()
+                .kind(Span.Kind.CLIENT)
                 .name(funName)
                 .tag("type", "rpcCall")
                 .tag("srcServiceName", srcServiceName)
@@ -51,21 +52,21 @@ public class HttpRpcAgentClient implements RpcAgentClient {
             if (content.getType().equals(RpcContentType.BYTES)) {
                 ByteRpcContent byteRpcContent = (ByteRpcContent) content;
                 byte[][] data = byteRpcContent.getParam();
-                rpcResult = httpProtoHandle(funName, data)
+                rpcResult = httpProtoHandle(funName, data, span)
                         .consumerValue(ret->{
                             byteRpcContent.setReturn(ret);
                         });
             } else if (content.getType().equals(RpcContentType.JSON)) {
                 JsonRpcContent jsonRpcContent = (JsonRpcContent) content;
                 String data = jsonRpcContent.getParam();
-                rpcResult = httpJsonHandle(funName, data)
+                rpcResult = httpJsonHandle(funName, data, span)
                         .consumerValue(ret->{
                             jsonRpcContent.setReturn(ret);
                         });
             } else if (content.getType().equals(RpcContentType.FILE)) {
                 FileRpcContent fileRpcContent = (FileRpcContent) content;
                 UploadFile uploadFile = fileRpcContent.getParam();
-                rpcResult = httpFormHandle(funName, uploadFile)
+                rpcResult = httpFormHandle(funName, uploadFile, span)
                         .consumerValue(ret->{
                             fileRpcContent.setReturn(ret);
                         });
@@ -73,19 +74,18 @@ public class HttpRpcAgentClient implements RpcAgentClient {
                 log.error("rpcCall contentType unknown, targetServiceName {} funName {} contentType {}", targetServiceName, funName, content.getType());
                 rpcResult = Homo.error(new RuntimeException("rpcCall contentType unknown"));
             }
-            return rpcResult.consumerValue(ret -> {
-                span.finish();
-            });
+            return rpcResult;
         } catch (Exception e) {
             span.error(e);
+            span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish();
             return Homo.error(e);
         }
     }
 
-    private Homo<String> httpJsonHandle(String funName, String param) {
-        Span span = ZipkinUtil.currentSpan();
+    private Homo<String> httpJsonHandle(String funName, String param, Span span) {
         String uri = URI.create(String.format("http://%s:%d/%s", targetServiceName, targetPort, funName)).toString();
         try {
+            span.annotate(ZipkinUtil.CLIENT_SEND_TAG);
             return Homo.warp(
                     webClient.post()
                             .uri(uri)
@@ -96,21 +96,22 @@ public class HttpRpcAgentClient implements RpcAgentClient {
                             .bodyValue(param)
                             .retrieve()
                             .bodyToMono((String.class))
-//                            .bodyToMono((byte[].class))
-                            .doOnSuccess(response -> span.finish())
-                            .doOnError(span::error)// 阻塞调用，可改为异步处理。
+                            .doOnSuccess(response -> span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish())
+                            .doOnError(err -> { span.error(err); span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish(); })
             );
 
         } catch (WebClientResponseException e) {
             log.error("HTTP request failed: {}", e.getResponseBodyAsString(), e);
+            span.error(e);
+            span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish();
             return Homo.error(e);
         }
     }
 
-    private Homo<byte[]> httpProtoHandle(String funName, byte[][] data) {
-        Span span = ZipkinUtil.currentSpan();
+    private Homo<byte[]> httpProtoHandle(String funName, byte[][] data, Span span) {
         String uri = URI.create(String.format("http://%s:%d/%s", targetServiceName, targetPort, funName)).toString();
         try {
+            span.annotate(ZipkinUtil.CLIENT_SEND_TAG);
             return Homo.warp(
                     webClient.post()
                             .uri(uri)
@@ -121,19 +122,21 @@ public class HttpRpcAgentClient implements RpcAgentClient {
                             .bodyValue(data[0])//headerInfo为第二个参数不传 目前仅支持传byte[]
                             .retrieve()
                             .bodyToMono(byte[].class)
-                            .doOnSuccess(response -> span.finish())
-                            .doOnError(span::error)
+                            .doOnSuccess(response -> span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish())
+                            .doOnError(err -> { span.error(err); span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish(); })
             ); // 阻塞调用，可改为异步处理。)
         } catch (WebClientResponseException e) {
             log.error("HTTP request failed: {}", e.getResponseBodyAsString(), e);
+            span.error(e);
+            span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish();
             return Homo.error(e);
         }
     }
 
-    private Homo<byte[]> httpFormHandle(String funName, UploadFile uploadFile) {
-        Span span = ZipkinUtil.currentSpan();
+    private Homo<byte[]> httpFormHandle(String funName, UploadFile uploadFile, Span span) {
         String uri = URI.create(String.format("http://%s:%d/%s", targetServiceName, targetPort, funName)).toString();
         try {
+            span.annotate(ZipkinUtil.CLIENT_SEND_TAG);
             return Homo.warp(
                     webClient.post()
                             .uri(uri)
@@ -144,11 +147,13 @@ public class HttpRpcAgentClient implements RpcAgentClient {
                             .bodyValue(uploadFile.content())
                             .retrieve()
                             .bodyToMono(byte[].class)
-                            .doOnSuccess(response -> span.finish())
-                            .doOnError(span::error)
+                            .doOnSuccess(response -> span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish())
+                            .doOnError(err -> { span.error(err); span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish(); })
             );
         } catch (WebClientResponseException e) {
             log.error("HTTP request failed: {}", e.getResponseBodyAsString(), e);
+            span.error(e);
+            span.annotate(ZipkinUtil.CLIENT_RECEIVE_TAG).finish();
             return Homo.error(e);
         }
     }

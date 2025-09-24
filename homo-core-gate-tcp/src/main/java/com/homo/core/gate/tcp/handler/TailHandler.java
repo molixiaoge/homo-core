@@ -37,9 +37,8 @@ public class TailHandler extends ChannelInboundHandlerAdapter {
         int port = socketAddress.getPort();
         log.info("channelActive channelId {} socketAddress {} hostAddress {} port {}",
                 ctx.channel().id(), socketAddress, hostAddress, port);
-        ZipkinUtil.startScope(ZipkinUtil.newSRSpan().name("channelActive"), span -> {
-            tcpGateDriver.createConnection(ctx, hostAddress, port);
-        }, null);
+        // 连接建立事件仅记录业务日志，不开启独立 SR 以避免过多生命周期类 span
+        tcpGateDriver.createConnection(ctx, hostAddress, port);
     }
 
     /**
@@ -51,9 +50,8 @@ public class TailHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         log.info("channelInactive address {}", ctx.channel().remoteAddress());
-        ZipkinUtil.startScope(ZipkinUtil.newSRSpan().name("channelInactive"), span -> {
-            tcpGateDriver.closeConnection(ctx, "channel inactive");
-        }, null);
+        // 连接断开事件仅记录业务日志，不开启独立 SR
+        tcpGateDriver.closeConnection(ctx, "channel inactive");
     }
 
 

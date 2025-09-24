@@ -22,7 +22,8 @@ public abstract class AbstractGateLogicHandler<T> extends ChannelInboundHandlerA
         GateMessagePackage messagePackage = (GateMessagePackage) source;
         GateMessageHeader header = messagePackage.getHeader();
         GateClient gateClient = ctx.channel().attr(TcpGateDriver.clientKey).get();
-        ZipkinUtil.startScope(ZipkinUtil.newSRSpan(), span -> doProcess((T) messagePackage, gateClient,header), null);
+        // 统一的抽象层不做埋点，具体协议处理器（Proto/JSON）负责按消息维度打 SR/SS
+        doProcess((T) messagePackage, gateClient, header);
     }
 
 }

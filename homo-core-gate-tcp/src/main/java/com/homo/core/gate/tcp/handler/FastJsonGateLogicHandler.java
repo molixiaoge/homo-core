@@ -20,7 +20,12 @@ public abstract class FastJsonGateLogicHandler extends AbstractGateLogicHandler<
         if (header.getType()== GateMessageType.JSON.ordinal()){
             JSONObject jsonObject = serializationProcessor.readValue(messagePackage.getBody(), JSONObject.class);
             GateClient gateClient = ctx.channel().attr(TcpGateDriver.clientKey).get();
-            ZipkinUtil.startScope(ZipkinUtil.newSRSpan(), span -> doProcess(jsonObject, gateClient,header), null);
+            // SR at inbound; SS after processing
+            ZipkinUtil.startScope(
+                    ZipkinUtil.nextOrCreateSRSpan(),
+                    span -> doProcess(jsonObject, gateClient, header),
+                    span -> span.annotate(ZipkinUtil.SERVER_SEND_TAG).finish()
+            );
         }else {
             //不是json数据 交给下一个handler处理
             ctx.fireChannelRead(source);

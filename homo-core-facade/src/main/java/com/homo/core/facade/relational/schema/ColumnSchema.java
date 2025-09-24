@@ -3,7 +3,7 @@ package com.homo.core.facade.relational.schema;
 import com.homo.core.facade.relational.mapping.HomoColumn;
 import com.homo.core.facade.relational.mapping.HomoId;
 import com.homo.core.facade.relational.mapping.HomoJsonColumn;
-import javafx.print.Collation;
+//import javafx.print.Collation;
 import lombok.Data;
 import org.springframework.util.StringUtils;
 
@@ -59,7 +59,7 @@ public class ColumnSchema {
             precision = homoColumn.precision();
         }
         isJson = HomoJsonColumn.class.isAssignableFrom(field.getType());
-        isCollection = Collation.class.isAssignableFrom(field.getType()) || Map.class.isAssignableFrom(field.getType());
+//        isCollection = Collation.class.isAssignableFrom(field.getType()) || Map.class.isAssignableFrom(field.getType());
         this.writeMethod = setMethod;
         this.readMethod = getMethod;
         HomoId homoId = field.getAnnotation(HomoId.class);
